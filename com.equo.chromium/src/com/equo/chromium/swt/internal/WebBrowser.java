@@ -1,6 +1,6 @@
 /****************************************************************************
 **
-** Copyright (C) 2022 Equo
+** Copyright (C) 2024 Equo
 **
 ** This file is part of Equo Chromium.
 **

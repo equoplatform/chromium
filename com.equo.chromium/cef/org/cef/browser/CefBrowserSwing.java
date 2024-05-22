@@ -10,6 +10,7 @@ import java.awt.event.WindowEvent;
 
 import javax.swing.SwingUtilities;
 
+import org.cef.CefBrowserSettings;
 import org.cef.CefClient;
 import org.cef.misc.Point;
 
@@ -23,7 +24,12 @@ public abstract class CefBrowserSwing extends CefBrowser_N {
 
     protected CefBrowserSwing(CefClient client, String url, CefRequestContext context,
             CefBrowser_N parent, Point inspectAt) {
-        super(client, url, context, parent, inspectAt);
+        this(client, url, context, parent, inspectAt, null);
+    }
+
+    protected CefBrowserSwing(CefClient client, String url, CefRequestContext context,
+            CefBrowser_N parent, Point inspectAt, CefBrowserSettings settings) {
+        super(client, url, context, parent, inspectAt, settings);
     }
 
     @Override

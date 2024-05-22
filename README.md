@@ -1,4 +1,4 @@
-# Equo Chromium Community Edition (**V116**)
+# Equo Chromium Community Edition (**V124**)
 
 The [Equo Chromium](https://www.equo.dev/chromium) Community Edition widget is a cross platform browser that allows users to create and render modern web-based UIs inside a Java application. It can be used in standalone Java applications, Windowless mode, Swing, SWT, or Eclipse RCP applications.
 
@@ -72,7 +72,7 @@ This repo uses GIT LFS, please install (https://git-lfs.github.com/) before clon
 
 ## Release Notes
 
-All the release notes for the Equo Chromium browser can be found [here](https://docs.equo.dev/chromium/116.x-ce/reference/release-notes.html).
+All the release notes for the Equo Chromium browser can be found [here](https://docs.equo.dev/chromium/124.x-ce/reference/release-notes.html).
 
 ## Support
 

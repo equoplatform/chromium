@@ -1,6 +1,6 @@
 /****************************************************************************
 **
-** Copyright (C) 2022 Equo
+** Copyright (C) 2024 Equo
 **
 ** This file is part of Equo Chromium.
 **
@@ -41,6 +41,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -55,6 +56,7 @@ import org.cef.SystemBootstrap;
 import org.cef.SystemBootstrap.Loader;
 import org.cef.WindowingToolkit;
 import org.cef.browser.CefBrowser;
+import org.cef.browser.CefBrowserSwt;
 import org.cef.callback.CefCommandLine;
 import org.cef.callback.CefSchemeRegistrar;
 import org.cef.handler.CefAppHandlerAdapter;
@@ -64,13 +66,14 @@ import com.equo.chromium.swt.internal.spi.DynamicCefSchemeHandlerFactory;
 import com.equo.chromium.swt.internal.spi.SchemeDomainPair;
 import com.equo.chromium.swt.internal.spi.SchemeHandler;
 import com.equo.chromium.swt.internal.spi.SchemeHandlerManager;
+import com.equo.chromium.swt.internal.spi.SecurityManager;
 import com.equo.chromium.swt.internal.spi.StaticCefSchemeHandlerFactory;
 
 public class Engine {
 	static {
 		loadLib();
 	}
-	private static final String CEFVERSION = "5845";
+	private static final String CEFVERSION = "6367";
 	private static final String SUBDIR = "chromium-" + CEFVERSION;
 	private static final String SCHEME_FILE = "file"; //$NON-NLS-1$
 	private static Path libsPath;
@@ -84,11 +87,11 @@ public class Engine {
 	public static final CompletableFuture<Boolean> ready = new CompletableFuture<>();
 	private static AtomicBoolean closing = new AtomicBoolean();
 	private static boolean multiThreaded;
-	
+
+	public static boolean setDarkModeBackground = false;
+
 	public static enum BrowserType {
-		SWT,
-		STANDALONE,
-		SWING
+		SWT, STANDALONE, SWING, HEADLESS
 	}
 
 	static BrowserType browserTypeInitialized = null;
@@ -110,7 +113,7 @@ public class Engine {
 		if (!Files.exists(libsPath))
 			throw new RuntimeException("Missing binaries for Equo Chromium Browser.");
 		boolean checkGtkInit = checkGtkInit();
-		String[] args = getChromiumArgs(libsPath, Boolean.getBoolean("chromium.init_threads"), checkGtkInit, null);
+		String[] args = getChromiumArgs(libsPath, Boolean.getBoolean("chromium.init_threads"), checkGtkInit, false, null);
 		setupCrashReporter();
 		if (!CefApp.startup(args)) {
 			if (checkGtkInit) {
@@ -263,7 +266,11 @@ public class Engine {
 						? Boolean.getBoolean("chromium.external_message_pump")
 						: external_message_pump);
 
-				String[] args = getChromiumArgs(libsPath, false, false, browserType);
+				String[] args = getChromiumArgs(libsPath, false, false, settings.remote_debugging_port > 0, browserType);
+
+				if (isDarkTheme(browserType, Arrays.asList(args))) {
+					CefBrowserSwt.setDarkMode(true);
+				}
 
 				final SchemeHandlerManager schemeHandlerManager = SchemeHandlerManager.get();
 
@@ -275,6 +282,7 @@ public class Engine {
 
 				WindowingToolkit windowToolkit = null;
 				switch (browserType) {
+				case HEADLESS:
 				case STANDALONE:
 					windowToolkit = new CefAppStandalone();
 					settings.external_message_pump = false;
@@ -313,6 +321,12 @@ public class Engine {
 								registrar.addCustomScheme(scheme, true, false, false, true, true, false, true);
 							}
 						}
+					}
+					
+					@SuppressWarnings("unused")
+					public boolean enableSecurity() {
+						SecurityManager securityManager = SecurityManager.get();
+						return securityManager != null && securityManager.isEnabled();
 					}
 
 					@Override
@@ -364,19 +378,47 @@ public class Engine {
 					}
 				}
 				if (BrowserType.SWT.equals(browserType)) {
+					if (debug) {
+						printSystemProperties();
+					}
 					SWTEngine.initCef(closing, shuttingDown, () -> internalShutdown());
 				}
-
 			}
 		}
 	}
 
-	static String[] getChromiumArgs(Path libsPath, boolean addXInitThreads, boolean addGtkInitCheck, BrowserType browserType) {
+	private static void printSystemProperties() {
+		System.out.println("------- Chromium system properties: -------");
+
+		String[] propertyNames = { "chromium.args", "chromium.cache_path", "chromium.custom_protocol", "chromium.debug",
+				"chromium.debug_port", "chromium.dialogs", "chromium.disable-download-progress",
+				"chromium.disable_script_extensions", "chromium.downloadLocationListener",
+				"chromium.enable_crash_reporter", "chromium.external_message_pump", "chromium.find_dialog",
+				"chromium.force_windowless_swt", "chromium.headless", "chromium.home", "chromium.init_threads",
+				"chromium.log_file", "chromium.multi_threaded_message_loop", "chromium.path",
+				"chromium.proxy_pac_script", "chromium.remote_debugging_port", "chromium.resize",
+				"chromium.setTextAsUrl", "chromium.ssl", "chromium.ssl.cert", "chromium.suspend_threads",
+				"chromium.turbolinks", "java.home", "java.specification.vendor", "java.vendor.version", "java.version",
+				"org.eclipse.swt.internal.deviceZoom", "org.eclipse.swt.internal.gtk.theme",
+				"org.eclipse.swt.internal.gtk.version", "os.arch", "os.name", "os.version", "osgi.ws", "sun.desktop",
+				"user.language" };
+
+		for (String propertyName : propertyNames) {
+			System.out.println(propertyName + "=" + System.getProperty(propertyName, ""));
+		}
+		System.out.println("--------- End Chromium properties ---------");
+	}
+
+	static String[] getChromiumArgs(Path libsPath, boolean addXInitThreads, boolean addGtkInitCheck,
+			boolean addRemoteAllowOrigins, BrowserType browserType) {
 		List<String> args = new ArrayList<>();
 		String vmArg = System.getProperty("chromium.args", System.getProperty("swt.chromium.args"));
 		if (vmArg != null) {
 			String[] lines = vmArg.replace("\\;", "\\#$").split(";");
 			Arrays.stream(lines).map(line -> line.replace("\\#$", ";")).forEach(l -> args.add(l));
+		}
+		if (addRemoteAllowOrigins) {
+			args.add("-remote-allow-origins=*");
 		}
 		if (isCrashReportedEnabled()) {
 			args.add("--enable-crash-reporter");
@@ -387,14 +429,23 @@ public class Engine {
 				args.add("XInitThreads");
 			if (addGtkInitCheck)
 				args.add("GTKInitCheck");
-			if (isDarkTheme(browserType)) {
+			if (isDarkTheme(browserType, args)) {
 				args.add("--force-dark-mode");
+			}
+			if (browserType == BrowserType.HEADLESS) {
+				args.add("--ozone-platform=headless");
+				args.add("--disable-gpu");
 			}
 		} else if (OS.isMacintosh()) {
 			args.add("--framework-dir-path=" + libsPath.resolve("Chromium Embedded Framework.framework"));
 			args.add("--main-bundle-path=" + libsPath.resolve("equochro Helper.app"));
-			if (isDarkTheme(browserType)) {
+			if (isDarkTheme(browserType, args)) {
 				args.add("--force-dark-mode");
+			}
+		} else if (OS.isWindows()) {
+			String langFlag = addFlagWithSystemLanguage();
+			if(!checkIfFlagExists(args, "--lang") && !langFlag.isEmpty()) {
+				args.add(langFlag);
 			}
 		}
 		return args.toArray(new String[args.size()]);
@@ -455,10 +506,36 @@ public class Engine {
 		return false;
 	}
 	
-	private static boolean isDarkTheme(BrowserType browserType) {
+	private static boolean isDarkTheme(BrowserType browserType, List<String> args) {
 		if (browserType != null && BrowserType.SWT.equals(browserType)) {
-			return SWTEngine.isSystemDarkTheme();
+			boolean flagExists = checkIfFlagExists(args, "--force-dark-mode");
+			setDarkModeBackground = flagExists ? true : SWTEngine.isSystemDarkTheme();
+			return setDarkModeBackground;
 		}
 		return false;
+	}
+	
+	private static boolean checkIfFlagExists(List<String> args, String flag) {
+		for (String str : args) {
+			if (str.contains(flag)) {
+				return true;
+			}
+		}
+		return false;
+	}
+	
+	private static String addFlagWithSystemLanguage() {
+		ArrayList<String> suportedLanguages = new ArrayList<String>();
+		ArrayList<String> suportedLanguagesWithCountry = new ArrayList<String>();
+		Collections.addAll(suportedLanguages, "af", "am", "ar", "bg", "bn", "ca", "cs", "da", "de", "el", "es", "et", "fa", "fi", "fil", "fr", "gu", "he", "hi", "hr", "hu", "id", "it", "ja", "kn", "ko", "lt", "lt", "ml", "mr", "ms", "nb", "nl", "pl", "ro", "ru", "sk", "sl", "sr", "sv", "sw", "ta", "te", "th", "tr", "uk", "ur", "vi");
+		Collections.addAll(suportedLanguagesWithCountry, "en-GB", "en-US", "es-419", "pt-BR", "pt-PT", "zh-CN", "zh-TW");
+		Locale currentLocale = Locale.getDefault();
+		if (suportedLanguages.contains(currentLocale.getLanguage())) {
+			return "--lang=" + currentLocale.getLanguage();
+		} else if (suportedLanguagesWithCountry.contains(currentLocale.getLanguage() + "-" + currentLocale.getCountry())) {
+			return "--lang=" + currentLocale.getLanguage() + "-" + currentLocale.getCountry();
+		} else {			
+			return "";
+		}
 	}
 }

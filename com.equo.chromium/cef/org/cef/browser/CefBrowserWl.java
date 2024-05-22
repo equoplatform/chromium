@@ -1,6 +1,6 @@
 /****************************************************************************
 **
-** Copyright (C) 2022 Equo
+** Copyright (C) 2024 Equo
 **
 ** This file is part of Equo Chromium.
 **
@@ -33,6 +33,7 @@ import org.cef.misc.Rectangle;
 
 import java.nio.ByteBuffer;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
 
 public class CefBrowserWl extends CefBrowser_N implements CefRenderHandler {
     private boolean hasFocus;
@@ -42,14 +43,31 @@ public class CefBrowserWl extends CefBrowser_N implements CefRenderHandler {
         public Rectangle getViewRect(CefBrowser browser) {
             return window;
         };
+        @Override
+        public void addOnPaintListener(Consumer<CefPaintEvent> listener) {
+            // TODO Auto-generated method stub
+            
+        }
+
+        @Override
+        public void setOnPaintListener(Consumer<CefPaintEvent> listener) {
+            // TODO Auto-generated method stub
+            
+        }
+
+        @Override
+        public void removeOnPaintListener(Consumer<CefPaintEvent> listener) {
+            // TODO Auto-generated method stub
+            
+        };
     };
 
     public CefBrowserWl(CefClient client, String url, CefRequestContext context) {
-        super(client, url, context, null, null);
+        super(client, url, context, null, null, null);
     }
 
     public CefBrowserWl(CefClient client, String url, CefRequestContext context, CefBrowser_N parent, Point inspectAt) {
-        super(client, url, context, parent, inspectAt);
+        super(client, url, context, parent, inspectAt, null);
     }
 
     @Override
@@ -149,5 +167,23 @@ public class CefBrowserWl extends CefBrowser_N implements CefRenderHandler {
 
     public void setWindow(Rectangle window) {
         this.window = window;
+    }
+
+    @Override
+    public void addOnPaintListener(Consumer<CefPaintEvent> listener) {
+        // TODO Auto-generated method stub
+        
+    }
+
+    @Override
+    public void setOnPaintListener(Consumer<CefPaintEvent> listener) {
+        // TODO Auto-generated method stub
+        
+    }
+
+    @Override
+    public void removeOnPaintListener(Consumer<CefPaintEvent> listener) {
+        // TODO Auto-generated method stub
+        
     }
 }

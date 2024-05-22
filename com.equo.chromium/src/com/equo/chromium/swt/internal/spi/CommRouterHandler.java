@@ -1,6 +1,6 @@
 /****************************************************************************
 **
-** Copyright (C) 2022 Equo
+** Copyright (C) 2024 Equo
 **
 ** This file is part of Equo Chromium.
 **
@@ -44,25 +44,11 @@ public class CommRouterHandler extends CefMessageRouterHandlerAdapter {
 	}
 
 	private CommunicationManager commManager;
-	private ExecutorService threadPool;
-	private ExecutorService queueThread;
-	private static volatile CommRouterHandler INSTANCE;
-
-	public static CommRouterHandler getInstance(CommunicationManager commManager) {
-		if (INSTANCE == null) {
-			synchronized (CommRouterHandler.class) {
-				if (INSTANCE == null) {
-					INSTANCE = new CommRouterHandler(commManager);
-				}
-			}
-		}
-		return INSTANCE;
-	}
+	private static ExecutorService threadPool = Executors.newCachedThreadPool(new DaemonThreadFactory());
+	private static ExecutorService queueThread = Executors.newSingleThreadExecutor(new DaemonThreadFactory());
 
 	public CommRouterHandler(CommunicationManager commManager) {
 		this.commManager = commManager;
-		this.threadPool = Executors.newCachedThreadPool(new DaemonThreadFactory());
-		this.queueThread = Executors.newSingleThreadExecutor(new DaemonThreadFactory());
 	}
 
 	private void handleRequest(String request, CefQueryCallback callback) {
@@ -97,7 +83,7 @@ public class CommRouterHandler extends CefMessageRouterHandlerAdapter {
 		private final String namePrefix;
 
 		DaemonThreadFactory() {
-			SecurityManager s = System.getSecurityManager();
+			java.lang.SecurityManager s = System.getSecurityManager();
 			group = (s != null) ? s.getThreadGroup() : Thread.currentThread().getThreadGroup();
 			namePrefix = "comm-pool-thread-";
 		}

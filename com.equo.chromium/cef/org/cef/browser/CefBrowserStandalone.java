@@ -1,6 +1,6 @@
 /****************************************************************************
 **
-** Copyright (C) 2022 Equo
+** Copyright (C) 2024 Equo
 **
 ** This file is part of Equo Chromium.
 **
@@ -43,11 +43,11 @@ public class CefBrowserStandalone extends CefBrowser_N {
     };
 
     public CefBrowserStandalone(CefClient client, String url, CefRequestContext context) {
-        super(client, url, context, null, null);
+        super(client, url, context, null, null, null);
     }
 
     public CefBrowserStandalone(CefClient client, String url, CefRequestContext context, CefBrowser_N parent, Point inspectAt) {
-		super(client, url, context, parent, inspectAt);
+		super(client, url, context, parent, inspectAt, null);
 	}
 
     @Override

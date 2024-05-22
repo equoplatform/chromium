@@ -1,6 +1,6 @@
 /****************************************************************************
 **
-** Copyright (C) 2022 Equo
+** Copyright (C) 2024 Equo
 **
 ** This file is part of Equo Chromium.
 **
@@ -33,7 +33,7 @@ public class CefClientSwt extends CefClient {
 
     @Override
     public CefBrowser createBrowser(String url, boolean isOffscreenRendered, boolean isTransparent,
-            CefRequestContext context) {
+            CefRequestContext context, CefBrowserSettings settings) {
         creating = true;
         if (isOffscreenRendered) {
             return new CefBrowserWl(this, url, context);

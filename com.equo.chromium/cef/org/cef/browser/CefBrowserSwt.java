@@ -1,6 +1,6 @@
 /****************************************************************************
 **
-** Copyright (C) 2022 Equo
+** Copyright (C) 2024 Equo
 **
 ** This file is part of Equo Chromium.
 **
@@ -49,6 +49,7 @@ public class CefBrowserSwt extends CefBrowser_N {
     private long handle;
     private Composite composite;
     protected org.eclipse.swt.graphics.Rectangle currentSize;
+    protected static boolean DARK_MODE = false;
 
     static {
         try {
@@ -59,6 +60,14 @@ public class CefBrowserSwt extends CefBrowser_N {
             } 
         } catch (ClassNotFoundException e) {
         }
+    }
+
+    public static void setDarkMode(boolean darkMode) {
+        DARK_MODE = darkMode;
+    }
+    
+    public static boolean isDarkMode() {
+        return DARK_MODE;
     }
 
     private static void getAutoScaleMethod(Class<?> dpiClass, String method) {
@@ -83,12 +92,12 @@ public class CefBrowserSwt extends CefBrowser_N {
     };
 
     public CefBrowserSwt(CefClient client, String url, CefRequestContext context) {
-        super(client, url, context, null, null);
+        super(client, url, context, null, null, null);
     }
 
     public CefBrowserSwt(CefClient client, String url, CefRequestContext context, CefBrowser_N parent,
         Point inspectAt) {
-        super(client, url, context, parent, inspectAt);
+        super(client, url, context, parent, inspectAt, null);
     }
 
     @Override

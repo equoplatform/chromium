@@ -4,10 +4,7 @@
 
 package org.cef;
 
-import org.cef.browser.CefBrowser;
-import org.cef.browser.CefFrame;
-import org.cef.browser.CefMessageRouter;
-import org.cef.browser.CefRequestContext;
+import org.cef.browser.*;
 import org.cef.callback.CefAuthCallback;
 import org.cef.callback.CefBeforeDownloadCallback;
 import org.cef.callback.CefCallback;
@@ -45,14 +42,13 @@ import org.cef.misc.Point;
 import org.cef.misc.Rectangle;
 import org.cef.network.CefRequest;
 import org.cef.network.CefRequest.TransitionType;
-import org.cef.network.CefResponse;
-import org.cef.network.CefURLRequest;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Vector;
+import java.util.function.Consumer;
 
 /**
  * Client that owns a browser and renderer.
@@ -100,11 +96,11 @@ public abstract class CefClient extends CefClientHandler
 
     public CefBrowser createBrowser(
             String url, boolean isOffscreenRendered, boolean isTransparent) {
-        return createBrowser(url, isOffscreenRendered, isTransparent, null);
+        return createBrowser(url, isOffscreenRendered, isTransparent, null, null);
     }
 
     public abstract CefBrowser createBrowser(String url, boolean isOffscreenRendered,
-            boolean isTransparent, CefRequestContext context);
+            boolean isTransparent, CefRequestContext context, CefBrowserSettings settings);
 
     @Override
     protected CefBrowser getBrowser(int identifier) {
@@ -270,6 +266,12 @@ public abstract class CefClient extends CefClientHandler
     public void onTitleChange(CefBrowser browser, String title) {
         if (displayHandler_ != null && browser != null)
             displayHandler_.onTitleChange(browser, title);
+    }
+
+    @Override
+    public void OnFullscreenModeChange(CefBrowser browser, boolean fullscreen) {
+        if (displayHandler_ != null && browser != null)
+            displayHandler_.OnFullscreenModeChange(browser, fullscreen);
     }
 
     @Override
@@ -506,11 +508,11 @@ public abstract class CefClient extends CefClientHandler
 
     @Override
     public boolean onBeforePopup(CefBrowser browser, CefFrame frame, String target_url,
-            String target_frame_name, String popupFeatures) {
+            String target_frame_name) {
         if (isDisposed_) return true;
         if (lifeSpanHandler_ != null && browser != null)
             return lifeSpanHandler_.onBeforePopup(
-                    browser, frame, target_url, target_frame_name, popupFeatures);
+                    browser, frame, target_url, target_frame_name);
         return false;
     }
 
@@ -560,7 +562,16 @@ public abstract class CefClient extends CefClientHandler
                 for (CefBrowser browser : browserList) {
                     browser.close(true);
                 }
-                return;
+                String os = System.getProperty("os.name").toLowerCase();
+                if (os.startsWith("windows 11")) {
+                    if (CefApp.getInstance().getAllClients().size() > 1) {
+                        return;
+                    } else {
+                        browser_.clear();
+                    }
+                } else {
+                    return;
+                }
             }
 
             if (browser_.isEmpty() && isDisposed_) {
@@ -732,6 +743,15 @@ public abstract class CefClient extends CefClientHandler
     }
 
     @Override
+    public void addOnPaintListener(Consumer<CefPaintEvent> listener) {}
+
+    @Override
+    public void setOnPaintListener(Consumer<CefPaintEvent> listener) {}
+
+    @Override
+    public void removeOnPaintListener(Consumer<CefPaintEvent> listener) {}
+
+    @Override
     public boolean startDragging(CefBrowser browser, CefDragData dragData, int mask, int x, int y) {
         if (browser == null) return false;
 
@@ -806,8 +826,10 @@ public abstract class CefClient extends CefClientHandler
     }
 
     @Override
-    public void onRenderProcessTerminated(CefBrowser browser, TerminationStatus status) {
-        if (requestHandler_ != null) requestHandler_.onRenderProcessTerminated(browser, status);
+    public void onRenderProcessTerminated(CefBrowser browser, TerminationStatus status, int errorCode,
+            String errorString) {
+        if (requestHandler_ != null)
+            requestHandler_.onRenderProcessTerminated(browser, status, errorCode, errorString);
     }
 
     // CefWindowHandler

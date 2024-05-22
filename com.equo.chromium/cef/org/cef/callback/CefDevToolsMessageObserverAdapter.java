@@ -1,6 +1,6 @@
 /****************************************************************************
 **
-** Copyright (C) 2022 Equo
+** Copyright (C) 2024 Equo
 **
 ** This file is part of Equo Chromium.
 **
@@ -24,7 +24,8 @@
 package org.cef.callback;
 
 import org.cef.browser.CefBrowser;
-import org.cef.misc.CefRegistration;
+import org.cef.browser.CefDevToolsMessageObserver;
+import org.cef.browser.CefRegistration;
 
 public class CefDevToolsMessageObserverAdapter implements CefDevToolsMessageObserver {
 	CefRegistration cefRegistration;
@@ -42,7 +43,7 @@ public class CefDevToolsMessageObserverAdapter implements CefDevToolsMessageObse
 
 	@Override
 	public void onDevToolsMethodResult(CefBrowser cefBrowser, int messageId, boolean success, String result,
-			int resultSize) {
+					int resultSize) {
 	}
 
 	@Override

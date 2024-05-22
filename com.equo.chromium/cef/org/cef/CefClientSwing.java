@@ -60,10 +60,10 @@ public class CefClientSwing extends CefClient {
 
     @Override
     public CefBrowser createBrowser(String url, boolean isOffscreenRendered, boolean isTransparent,
-            CefRequestContext context) {
+            CefRequestContext context, CefBrowserSettings settings) {
         if (isDisposed_)
             throw new IllegalStateException("Can't create browser. CefClient is disposed");
-        return CefBrowserFactory.create(this, url, isOffscreenRendered, isTransparent, context);
+        return CefBrowserFactory.create(this, url, isOffscreenRendered, isTransparent, context, settings);
     }
 
     @Override

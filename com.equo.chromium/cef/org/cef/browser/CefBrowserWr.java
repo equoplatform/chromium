@@ -4,6 +4,7 @@
 
 package org.cef.browser;
 
+import org.cef.CefBrowserSettings;
 import java.awt.BorderLayout;
 import java.awt.Canvas;
 import java.awt.Component;
@@ -165,14 +166,15 @@ class CefBrowserWr extends CefBrowserSwing {
         }
     };
 
-    CefBrowserWr(CefClient client, String url, CefRequestContext context) {
-        this(client, url, context, null, null);
+    CefBrowserWr(
+            CefClient client, String url, CefRequestContext context, CefBrowserSettings settings) {
+        this(client, url, context, null, null, settings);
     }
 
     @SuppressWarnings("serial")
     private CefBrowserWr(CefClient client, String url, CefRequestContext context,
-            CefBrowserWr parent, Point inspectAt) {
-        super(client, url, context, parent, inspectAt);
+            CefBrowserWr parent, Point inspectAt, CefBrowserSettings settings) {
+        super(client, url, context, parent, inspectAt, settings);
         delayedUpdate_.setRepeats(false);
 
         // Disabling lightweight of popup menu is required because
@@ -319,7 +321,7 @@ class CefBrowserWr extends CefBrowserSwing {
     @Override
     protected CefBrowser_N createDevToolsBrowser(CefClient client, String url,
             CefRequestContext context, CefBrowser_N parent, Point inspectAt) {
-        return new CefBrowserWr(client, url, context, (CefBrowserWr) this, inspectAt);
+        return new CefBrowserWr(client, url, context, (CefBrowserWr) this, inspectAt, null);
     }
 
     private synchronized long getWindowHandle() {
@@ -422,5 +424,17 @@ class CefBrowserWr extends CefBrowserSwing {
     @Override
     public CompletableFuture<Object> createScreenshot(boolean nativeResolution) {
         throw new UnsupportedOperationException("Unsupported for windowed rendering");
+    }
+
+    @Override
+    public void setWindowlessFrameRate(int frameRate) {
+        throw new UnsupportedOperationException(
+                "You can only set windowless framerate on OSR browser");
+    }
+
+    @Override
+    public CompletableFuture<Integer> getWindowlessFrameRate() {
+        throw new UnsupportedOperationException(
+                "You can only get windowless framerate on OSR browser");
     }
 }

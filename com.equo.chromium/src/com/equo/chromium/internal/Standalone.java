@@ -1,6 +1,6 @@
 /****************************************************************************
 **
-** Copyright (C) 2022 Equo
+** Copyright (C) 2024 Equo
 **
 ** This file is part of Equo Chromium.
 **
@@ -32,7 +32,7 @@ public final class Standalone extends IndependentBrowser {
 	private void init(String url) {
 		Engine.initCEF(Engine.BrowserType.STANDALONE);
 		createClient();
-		setBrowser(getClientHandler().createBrowser(url, false, false, createRequestContext()));
+		setBrowser(getClientHandler().createBrowser(url, false, false, createRequestContext(), null));
 		getBrowser().setReference(this);
 	}
 

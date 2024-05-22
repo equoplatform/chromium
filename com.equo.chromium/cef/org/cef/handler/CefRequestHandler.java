@@ -123,5 +123,5 @@ public interface CefRequestHandler {
      * @param browser The corresponding browser.
      * @param status Indicates how the process was  terminated.
      */
-    void onRenderProcessTerminated(CefBrowser browser, TerminationStatus status);
+    void onRenderProcessTerminated(CefBrowser browser, TerminationStatus status, int errorCode, String errorString);
 }

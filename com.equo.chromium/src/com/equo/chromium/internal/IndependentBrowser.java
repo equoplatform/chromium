@@ -1,6 +1,6 @@
 /****************************************************************************
 **
-** Copyright (C) 2022 Equo
+** Copyright (C) 2024 Equo
 **
 ** This file is part of Equo Chromium.
 **
@@ -31,7 +31,6 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Base64;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -67,6 +66,7 @@ import org.cef.misc.Rectangle;
 import org.cef.network.CefRequest.TransitionType;
 
 import com.equo.chromium.ChromiumBrowser;
+import com.equo.chromium.Storage;
 import com.equo.chromium.internal.Engine.BrowserType;
 import com.equo.chromium.swt.internal.spi.CommRouterHandler;
 import com.equo.chromium.swt.internal.spi.CommunicationManager;
@@ -74,6 +74,7 @@ import com.equo.chromium.swt.internal.spi.ScriptExtension;
 import com.equo.chromium.utils.EventAction;
 import com.equo.chromium.utils.EventType;
 import com.equo.chromium.utils.PdfPrintSettings;
+import com.equo.chromium.utils.StorageType;
 import com.github.cliftonlabs.json_simple.JsonException;
 import com.github.cliftonlabs.json_simple.JsonObject;
 import com.github.cliftonlabs.json_simple.Jsoner;
@@ -87,25 +88,25 @@ public abstract class IndependentBrowser implements ChromiumBrowser {
 	private List<ConsoleListener> consoleListeners = new ArrayList<ConsoleListener>();
 	private String lastSearch = null;
 	private static final String DATA_TEXT_URL = "data:text/html;base64,";
-	private Map<EventType, List<EventAction>> subscribeEvents = new HashMap<>();
-	private Map<Long, ActionData> subscribeIndex = new HashMap<>();
-	private long eventId = 0;
+	private Storage localStorage;
+	private Storage sessionStorage;
 	private static ExecutorService executor = Executors.newSingleThreadExecutor(r -> {
 		Thread thread = new Thread(r, "chromium-MessageRoute");
 		thread.setDaemon(true);
 		return thread;
 	});
 	private int messageId = 0;
-	protected static EventAction eventActionOfAfterCreated = null;
+	private volatile Subscriber subscriber = null;
 
-	class ActionData {
-		public EventType eventType;
-		public Runnable action;
-
-		public ActionData(EventType eventType, Runnable action) {
-			this.eventType = eventType;
-			this.action = action;
+	public Subscriber getSubscriber() {
+		if (subscriber == null) {
+			synchronized (this) {
+				if (subscriber == null) {
+					subscriber = new Subscriber(this);
+				}
+			}
 		}
+		return subscriber;
 	}
 
 	@Override
@@ -134,14 +135,7 @@ public abstract class IndependentBrowser implements ChromiumBrowser {
 		clientHandler.addLifeSpanHandler(new CefLifeSpanHandlerAdapter() {
 			@Override
 			public void onAfterCreated(CefBrowser browser) {
-				if (eventActionOfAfterCreated != null && !created.isDone()) {
-					Map<String, Object> mapData = new HashMap<>();
-					mapData.put("chromium_instance", (ChromiumBrowser)browser.getReference());
-					eventActionOfAfterCreated.setJsonData(mapData);
-					eventActionOfAfterCreated.run();
-				}
-				created.complete(true);
-				notifySubscribers(EventType.onAfterCreated);
+				getSubscriber().onAfterCreatedNotify(browser);
 			}
 		});
 		clientHandler.addRequestHandler(new CefRequestHandlerAdapter() 
@@ -164,60 +158,35 @@ public abstract class IndependentBrowser implements ChromiumBrowser {
 			@Override
 			public boolean onConsoleMessage(CefBrowser browser, LogSeverity level, String message, String source,
 					int line) {
-				Map<String, Object> mapData = new HashMap<>();
-				mapData.put("level", level.toString());
-				mapData.put("message", message);
-				mapData.put("source", source);
-				mapData.put("line", line);
-				notifySubscribers(EventType.onConsoleMessage, mapData);
+				getSubscriber().onConsoleMessageNotify(level, message, source, line);
 				return IndependentBrowser.this.onConsoleMessage(browser, level, message, source, line);
 			}
 
 			@Override
 			public void onFullscreenModeChange(CefBrowser browser, boolean fullscreen) {
-				if (fullscreen) {
-					notifySubscribers(EventType.onFullScreenEntered);
-				} else {
-					notifySubscribers(EventType.onFullScreenExited);
-				}
+				getSubscriber().onFullscreenModeChangeNotify(fullscreen);
 			}
 		});
 		clientHandler.addLoadHandler(new CefLoadHandler() {
-			
 			@Override
 			public void onLoadingStateChange(CefBrowser browser, boolean isLoading, boolean canGoBack, boolean canGoForward) {
-				notifySubscribers(EventType.onLoadingStateChange);
+				getSubscriber().onLoadingStateChangeNotify(isLoading, browser.getURL());
 			}
-			
+
 			@Override
 			public void onLoadStart(CefBrowser browser, CefFrame frame, TransitionType transitionType) {
-				notifySubscribers(EventType.onLoadStart);
+				getSubscriber().onLoadStartNotify();
 			}
 			
 			@Override
 			public void onLoadError(CefBrowser browser, CefFrame frame, ErrorCode errorCode, String errorText,
 					String failedUrl) {
-				notifySubscribers(EventType.onLoadError);
+				getSubscriber().onLoadErrorNotify(errorCode.getCode());
 			}
-			
+
 			@Override
 			public void onLoadEnd(CefBrowser browser, CefFrame frame, int httpStatusCode) {
-				CefFrame parentFrame = frame.getParent();
-				final boolean isMain = frame.isMain();
-				final long parentId = parentFrame != null ? parentFrame.getIdentifier() : 0;
-				frame.getSource(new CefStringVisitor() {
-					@Override
-					public void visit(String source) {
-						String jsonSource = source.replaceAll("\"", "\\\\\"").replaceAll("\n", "\\\\n");
-						Map<String, Object> mapData = new HashMap<>();
-						mapData.put("isMain", isMain);
-						mapData.put("html", jsonSource);
-						mapData.put("name", frame.getName());
-						mapData.put("id", frame.getIdentifier());
-						mapData.put("parentId", parentId);
-						notifySubscribers(EventType.onLoadEnd, mapData);
-					}
-				});
+				getSubscriber().onLoadEndNotify(frame);
 			}
 		});
 		clientHandler.addFindHandler(new CefFindHandler() {
@@ -225,18 +194,21 @@ public abstract class IndependentBrowser implements ChromiumBrowser {
 			public void onFindResult(CefBrowser browser, int identifier, int count, Rectangle selectionRect,
 					int activeMatchOrdinal, boolean finalUpdate) {
 				if (finalUpdate) {
-					Map<String, Object> mapData = new HashMap<>();
-					mapData.put("count", count);
-					mapData.put("activeMatchOrdinal", activeMatchOrdinal);
-					notifySubscribers(EventType.onFindResult, mapData);
+					getSubscriber().onFindResultNotify(count, activeMatchOrdinal);
 				}
 			}
 		});
-		clientHandler.addPrintHandler(new  CefPrintHandlerAdapter() { });
+		clientHandler.addDisplayHandler(new CefDisplayHandlerAdapter() {
+			@Override
+			public void onAddressChange(CefBrowser browser, CefFrame frame, String url) {
+				getSubscriber().onAddressChangeNotify(browser.isLoading(), url);
+			}
+		});
+		clientHandler.addPrintHandler(new CefPrintHandlerAdapter() { });
 		CommunicationManager commManager = CommunicationManager.get();
 		if (commManager != null) {
 			CefMessageRouter commRouter = CommRouterHandler.createRouter();
-			commRouter.addHandler(CommRouterHandler.getInstance(commManager), true);
+			commRouter.addHandler(new CommRouterHandler(commManager), true);
 			clientHandler.addMessageRouter(commRouter);
 		}
 
@@ -250,43 +222,20 @@ public abstract class IndependentBrowser implements ChromiumBrowser {
 		}
 	}
 
-	protected void notifySubscribers(EventType eventType) {
-		notifySubscribers(eventType, new HashMap<String, Object>());
-	}
-
-	protected synchronized void notifySubscribers(EventType eventType, Map<String, Object> mapData) {
-		subscribeEvents.computeIfAbsent(eventType, m -> new ArrayList<EventAction>()).forEach(e -> {
-			e.setJsonData(mapData);
-			CompletableFuture.runAsync(e);
-		});
-	}
-	
 	public static void subscribeOnAfterCreated(EventAction eventAction) {
-		eventActionOfAfterCreated = eventAction;
+		Subscriber.subscribeOnAfterCreated(eventAction);
 	}
 
-	public synchronized long subscribe(EventType eventType, EventAction action) {
-		created.thenRun(() -> {
-			subscribeEvents.computeIfAbsent(eventType, m -> new ArrayList<EventAction>()).add(action);
-			subscribeIndex.put(eventId, new ActionData(eventType, action));
-		});
-		return eventId++;
+	public long subscribe(EventType eventType, EventAction action) {
+		return getSubscriber().subscribe(eventType, action);
 	}
 
-	public synchronized boolean unSubscribe(long idEvent) {
-		created.thenRun(() -> {
-			ActionData actionData = subscribeIndex.get(idEvent);
-			if (actionData != null) {
-				subscribeEvents.get(actionData.eventType).remove(actionData.action);
-				subscribeIndex.remove(idEvent);
-			}
-		});
-		return false;
+	public boolean unSubscribe(long idEvent) {
+		return getSubscriber().unSubscribe(idEvent);
 	}
 
-	public synchronized void unSubscribeAll() {
-		subscribeIndex.clear();
-		subscribeEvents.clear();
+	public void unSubscribeAll() {
+		getSubscriber().unSubscribeAll();
 	}
 
 	protected CefRequestContext createRequestContext() {
@@ -368,7 +317,7 @@ public abstract class IndependentBrowser implements ChromiumBrowser {
 	@Override
 	public void zoom(double zoomLevel) {
 		getBrowser().setZoomLevel(zoomLevel);
-		notifySubscribers(EventType.onZoomChanged);
+		getSubscriber().notifySubscribers(EventType.onZoomChanged);
 	}
 
 	@Override
@@ -377,10 +326,15 @@ public abstract class IndependentBrowser implements ChromiumBrowser {
 	}
 
 	@Override
-	public void executeJavacript(String script) {
+	public void executeJavaScript(String script) {
 		created.thenRun(() -> {
 			getBrowser().executeJavaScript(script, "", 0);
 		});
+	}
+
+	@Override
+	public void executeJavacript(String script) {
+		executeJavaScript(script);
 	}
 
 	@Override
@@ -417,7 +371,7 @@ public abstract class IndependentBrowser implements ChromiumBrowser {
 			}
 		};
 		JsonObject jsonMessage = new JsonObject();
-		jsonMessage.put("id", 0);
+		jsonMessage.put("id", messageId++);
 		jsonMessage.put("method", "Page.captureScreenshot");
 		JsonObject clip = new JsonObject();
 		if (width > 0 && height > 0) {
@@ -543,13 +497,12 @@ public abstract class IndependentBrowser implements ChromiumBrowser {
 			int id = messageId++;
 			new CefDevToolsMessageObserverAdapter(getBrowser()) {
 				@Override
-				public void onDevToolsMethodResult(CefBrowser cefBrowser, int messageId, boolean success, String result,
-						int resultSize) {
+				public void onDevToolsMethodResult(CefBrowser cefBrowser, int messageId, boolean success, String result, int resultSize) {
+					debugPrint("onDevToolsMethodResult: " +result);
+					if (id != messageId) {
+						return;
+					}
 					try {
-						debugPrint("onDevToolsMethodResult: " +result);
-						if (id != messageId) {
-							return;
-						}
 						JsonObject json = (JsonObject) Jsoner.deserialize(result);
 						messageResult.complete(wanted == null || wanted.isEmpty() ? json : json.get(wanted));
 					} catch (JsonException e) {
@@ -628,12 +581,8 @@ public abstract class IndependentBrowser implements ChromiumBrowser {
 			pdfPrintSettings.landscape = settings.landscape;
 			pdfPrintSettings.print_background = settings.print_background;
 			pdfPrintSettings.page_ranges = settings.page_ranges;
-			if (settings.paper_width >= 1000) {
-				pdfPrintSettings.paper_width = settings.paper_width;
-			}
-			if (settings.paper_height >= 1000) {
-				pdfPrintSettings.paper_height = settings.paper_height;
-			}
+			pdfPrintSettings.paper_width = settings.paper_width;
+			pdfPrintSettings.paper_height = settings.paper_height;
 			pdfPrintSettings.prefer_css_page_size = settings.prefer_css_page_size;
 			pdfPrintSettings.scale = settings.scale;
 			pdfPrintSettings.margin_top = settings.margin_top;
@@ -641,7 +590,7 @@ public abstract class IndependentBrowser implements ChromiumBrowser {
 			pdfPrintSettings.margin_bottom = settings.margin_bottom;
 			pdfPrintSettings.margin_left = settings.margin_left;
 			if (settings.margin_type != null) {
-				pdfPrintSettings.margin_type = CefPdfPrintSettings.MarginType.valueOf(settings.margin_type.name());;
+				pdfPrintSettings.margin_type = CefPdfPrintSettings.MarginType.valueOf(settings.margin_type.name());
 			}
 		}
 
@@ -666,5 +615,27 @@ public abstract class IndependentBrowser implements ChromiumBrowser {
 		}
 		throw new UnsupportedOperationException("You cannot initialize such browsers, because browsers of type "
 				+ Engine.browserTypeInitialized + " are already initialized.");
+	}
+
+	public Storage getLocalStorage() {
+		if (localStorage == null) {
+			synchronized (Storage.class) {
+				if (localStorage == null) {
+					localStorage = new Storage(this, StorageType.LOCAL);
+				}
+			}
+		}
+		return localStorage;
+	}
+
+	public Storage getSessionStorage() {
+		if (sessionStorage == null) {
+			synchronized (Storage.class) {
+				if (sessionStorage == null) {
+					sessionStorage = new Storage(this, StorageType.SESSION);
+				}
+			}
+		}
+		return sessionStorage;
 	}
 }

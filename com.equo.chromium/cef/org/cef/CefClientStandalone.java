@@ -10,7 +10,7 @@ public class CefClientStandalone extends CefClient {
 
     @Override
     public CefBrowser createBrowser(String url, boolean isOffscreenRendered, boolean isTransparent,
-            CefRequestContext context) {
+            CefRequestContext context, CefBrowserSettings settings) {
         creating = true;
         if (isOffscreenRendered) {
             return new CefBrowserWl(this, url, context);

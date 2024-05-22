@@ -1,6 +1,6 @@
 /****************************************************************************
 **
-** Copyright (C) 2022 Equo
+** Copyright (C) 2024 Equo
 **
 ** This file is part of Equo Chromium.
 **
@@ -41,7 +41,7 @@ public final class Windowless extends IndependentBrowser {
 	public Windowless(String url, Rectangle window) {
 		Engine.initCEF(getBrowserType());
 		createClient();
-		setBrowser(getClientHandler().createBrowser(url, true, false, createRequestContext()));
+		setBrowser(getClientHandler().createBrowser(url, true, false, createRequestContext(), null));
 		CefBrowser browser = getBrowser();
 		browser.setReference(this);
 		browser.createImmediately();
@@ -54,9 +54,7 @@ public final class Windowless extends IndependentBrowser {
 		if (Boolean.getBoolean("chromium.force_windowless_swt")) {
 			return BrowserType.SWT;
 		}
-		if (Engine.browserTypeInitialized != null) {
-			return null;
-		}
+
 		try {
 			Class<?> clazz = Class.forName("org.eclipse.swt.widgets.Display", false,
 					ChromiumBrowser.class.getClassLoader());
@@ -69,8 +67,8 @@ public final class Windowless extends IndependentBrowser {
 				}
 			}
 		} catch (Throwable e) {
-
 		}
-		return BrowserType.STANDALONE;
+
+		return BrowserType.HEADLESS;
 	}
 }

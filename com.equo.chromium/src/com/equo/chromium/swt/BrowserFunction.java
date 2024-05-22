@@ -1,6 +1,6 @@
 /****************************************************************************
 **
-** Copyright (C) 2022 Equo
+** Copyright (C) 2024 Equo
 **
 ** This file is part of Equo Chromium.
 **
@@ -174,6 +174,16 @@ public void dispose () {
 	dispose (true);
 }
 
+/**
+ * Disposes of the resources associated with this BrowserFunction.
+ * Applications must dispose of all BrowserFunctions that they create.
+ * </p><p>
+ * Note that disposing a Browser automatically disposes all
+ * BrowserFunctions associated with it.
+ * </p>
+ * 
+ * @param remove Destroy BrowserFunction when remove is true.
+ */
 public void dispose (boolean remove) {
 	if (index < 0) return;
 	if (remove) browser.webBrowser.destroyFunction (this);
@@ -268,6 +278,11 @@ public boolean isDisposed () {
 	return index < 0;
 }
 
+/**
+ * Gets a array names of all frames in context browser.
+ * 
+ * @return Returns an array with all the names of frames in the context browser.
+ */
 public String[] getFrameNames() {
 	return frameNames;
 }

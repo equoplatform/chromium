@@ -1,6 +1,6 @@
 /****************************************************************************
 **
-** Copyright (C) 2022 Equo
+** Copyright (C) 2024 Equo
 **
 ** This file is part of Equo Chromium.
 **
@@ -30,7 +30,7 @@ import java.util.concurrent.CompletableFuture;
 
 public class CefPopup extends CefBrowser_N {
     public CefPopup(CefBrowser parent) {
-        super(null, null, null, (CefBrowser_N) parent, null);
+        super(null, null, null, (CefBrowser_N) parent, null, null);
     }
 
     @Override
